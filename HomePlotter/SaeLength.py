@@ -27,7 +27,16 @@ class SaeLength(object):
             if self.sixteenths() > 0: 
                 os += "-"
         if self.sixteenths() > 0:
-            os += self.sixteenths().__str__() + "/16"
+            n = self.sixteenths()
+            d = 16
+            while True:
+                if n % 2 == 0:
+                    n = int(n / 2)
+                    d = int(d / 2)
+                else:
+                    break
+            
+            os += n.__str__() + "/" + d.__str__()
         if self.inches() > 0 or self.sixteenths() > 0:
             os += "\""
         return os

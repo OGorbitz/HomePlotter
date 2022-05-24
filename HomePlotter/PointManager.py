@@ -1,3 +1,4 @@
+import json
 import tkinter as tk
 from SaePoint import SaePoint
 from SaeLength import SaeLength
@@ -5,11 +6,11 @@ from SaeLength import SaeLength
 
 class PointManager(object):
     OriginPoint = SaePoint(0, 0)
-    BasisPoint = SaePoint(0, 0)
     
     Points = []
 
     def Init():
+        PointManager.Points.append(SaePoint(1,0))
         GUI.init()
     
     def Loop():
@@ -17,15 +18,35 @@ class PointManager(object):
     
     def AddPoint(point):
         PointManager.Points.append(point)
-        GUI.updatePoints(PointManager.BasisPoint, PointManager.Points)
+        GUI.updatePoints()
     def RemovePoint(index):
         PointManager.Points.pop(index)
-        GUI.updatePoints(PointManager.BasisPoint, PointManager.Points)
+        GUI.updatePoints()
     def PrintDistances():
         for p in PointManager.Points:
             d1 = PointManager.OriginPoint.distance(p)
             d2 = PointManager.BasisPoint.distance(p)
             print( "(" + SaeLength(p.x).__str__() + "," + SaeLength(p.y).__str__() + ") " + d1.__str__() + " | " + d2.__str__())
+
+    def SavePoints():
+        with open("plot.json", "w", encoding="utf-8") as f:
+            json.dump(PointManager.Points, f, default=lambda o: o.encode(), ensure_ascii=False, indent=4)
+            f.close()
+    def LoadPoints():
+        pts = []
+        try:
+            with open("plot.json", "r", encoding="utf-8") as f:
+                pts = json.load(f)
+                f.close()
+        except:
+            return
+
+        PointManager.Points = []
+
+        for pt in pts:
+            PointManager.Points.append(SaePoint(pt["x"], pt["y"]))
+        GUI.updatePoints()
+
 
 
 class GUI(object):
@@ -124,13 +145,16 @@ class GUI(object):
         tk.Button(adframe, text="Add Point", command=GUI.addButton, state=tk.NORMAL).grid(column=1,row=0)
 
         df.pack(side=tk.LEFT)
+
+        tk.Button(cf, text="Save", command=PointManager.SavePoints, justify=tk.LEFT).pack()
+        tk.Button(cf, text="Load", command=PointManager.LoadPoints, justify=tk.RIGHT).pack()
         cf.pack(side=tk.RIGHT, fill="both")
 
     def loop():
         GUI.window.mainloop()
 
     def deleteButton():
-        i = GUI.pointList.curselection()[0] - 2
+        i = GUI.currIndex
 
         #Only remove point if 0 or higher. Otherwise, it is the origin/basis point
         if i >= 0:
@@ -138,8 +162,9 @@ class GUI(object):
 
     def addButton():
         point = SaePoint(0,0)
-        GUI.setInput(point)
         PointManager.AddPoint(point)
+        GUI.setInput(point)
+        GUI.currIndex = PointManager.Points.__len__() - 1
 
     def setInput(point: SaePoint):
         GUI.textXF.set(point.lx().feet())
@@ -148,7 +173,7 @@ class GUI(object):
         GUI.textYI.set(point.ly().inches())
 
     def checkInput(var = 0):
-        if GUI.currIndex < -1:
+        if GUI.currIndex < 0:
             return
         
         ix = 0
@@ -176,12 +201,10 @@ class GUI(object):
 
         GUI.textError = ""
 
-        if GUI.currIndex == -1:
-            PointManager.BasisPoint.x = ix
-        else:
-            PointManager.Points[GUI.currIndex].x = ix
-            PointManager.Points[GUI.currIndex].y = iy
-        GUI.updatePoints(PointManager.BasisPoint, PointManager.Points)
+        PointManager.Points[GUI.currIndex].x = ix
+        PointManager.Points[GUI.currIndex].y = iy
+
+        GUI.updatePoints()
 
     def pointSelected(event):
         sel = GUI.nameList.curselection()
@@ -213,22 +236,19 @@ class GUI(object):
             GUI.entryYF["state"] = tk.NORMAL
             GUI.entryYI["state"] = tk.NORMAL
 
-        if index == -1:
-            GUI.setInput(PointManager.BasisPoint)
-        if index >= 0:
-            GUI.setInput(PointManager.Points[index])
+        GUI.setInput(PointManager.Points[index])
         
     #Updates list and canvas with the given data
-    def updatePoints(basisPoint, points):
+    def updatePoints():
         #Clear canvas
         GUI.canvas.delete("all")
 
         #Calculate maximum and minimum x or y value for proper scaling
-        maxx = basisPoint.x
+        maxx = PointManager.Points[0].x
         minx = 0
-        maxy = basisPoint.y
+        maxy = PointManager.Points[0].y
         miny = 0;
-        for p in points:
+        for p in PointManager.Points:
             if p.x > maxx:
                 maxx = p.x
             if p.y > maxy:
@@ -245,38 +265,49 @@ class GUI(object):
 
         #Draw origin and base point
         GUI.drawPoint(0, 0, "O", "#0000aa", padding, scale)
-        GUI.drawPoint(basisPoint.x, basisPoint.y, "B", "#aa0000", padding, scale)
+        GUI.drawPoint(PointManager.Points[0].x, PointManager.Points[0].y, "B", "#aa0000", padding, scale)
 
         #Draw remaining points, using N to specify the point number
-        n = 1
-        for p in points:
-            GUI.drawPoint(p.x, p.y, "P"+n.__str__(), padding=padding, scale=scale)
+        n = -1
+        for p in PointManager.Points:
             n = n + 1
+            if n == 0:
+                continue
+            GUI.drawPoint(p.x, p.y, "P"+n.__str__(), padding=padding, scale=scale)
     
-        #Update points in list        
+        #Add values for top of list
         GUI.nameList.delete(0, tk.END)
-        GUI.nameList.insert(0, ("BP"))
+        GUI.nameList.insert(0, ("P#"))
+        GUI.nameList.insert(1, ("B"))
 
         GUI.pointListX.delete(0, tk.END)
-        GUI.pointListX.insert(0, SaeLength(basisPoint.x).__str__())
+        GUI.pointListX.insert(0, "X")
+        GUI.pointListX.insert(1, SaeLength(PointManager.Points[0].x).__str__())
 
         GUI.pointListY.delete(0, tk.END)
-        GUI.pointListY.insert(0, SaeLength(basisPoint.y).__str__())
+        GUI.pointListY.insert(0, "Y")
+        GUI.pointListY.insert(1, SaeLength(PointManager.Points[0].y).__str__())
 
         GUI.distList1.delete(0, tk.END)
         GUI.distList1.insert(0, "D1")
+        GUI.distList1.insert(1, PointManager.Points[0].distance(PointManager.OriginPoint).__str__())
 
         GUI.distList2.delete(0, tk.END)
         GUI.distList2.insert(0, "D2")
+        GUI.distList2.insert(1, "-")
 
-        n = 1
-        for p in points:
-            GUI.nameList.insert(n, "P" + n.__str__())
-            GUI.pointListX.insert(n, SaeLength(p.x).__str__())
-            GUI.pointListY.insert(n, SaeLength(p.y).__str__())
-            GUI.distList1.insert(n, p.distance(PointManager.OriginPoint).__str__())
-            GUI.distList2.insert(n, p.distance(PointManager.BasisPoint).__str__())
+        #Update points in list        
+        n = -1
+        for p in PointManager.Points:
             n = n + 1
+            if n == 0:
+                continue
+            GUI.nameList.insert(n + 1, "P" + n.__str__())
+            GUI.pointListX.insert(n + 1, SaeLength(p.x).__str__())
+            GUI.pointListY.insert(n + 1, SaeLength(p.y).__str__())
+            GUI.distList1.insert(n + 1, p.distance(PointManager.OriginPoint).__str__())
+            GUI.distList2.insert(n + 1, p.distance(PointManager.Points[0]).__str__())
+
 
         
     #Draw a point using specified label text, color, and padding/scale
