@@ -1,5 +1,6 @@
 import math
 
+# Specifies an object that contains a size specified in inches, with functions to return feet, inches, and sixteenths in standard SAE format
 class SaeLength(object):
     def __init__(self, inches, feet=0):
         self.totalInches = inches + feet * 12
@@ -13,6 +14,7 @@ class SaeLength(object):
     def sixteenths(self):
         return math.floor(self.totalInches % 1 * 16)
 
+    # Output as a string in format _' _"_/16
     def __str__(self):
         if self.totalInches <= 0:
             return "0"

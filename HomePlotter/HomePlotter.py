@@ -1,8 +1,9 @@
-from PointManager import PointManager, GUI
-from SaePoint import SaePoint
+from PointManager import PointManager
+from GUI import GUI
 
-
-PointManager.Init()
+# Initialize components
+GUI.init()
 GUI.updatePoints()
 
-PointManager.Loop()
+# Run program
+GUI.loop()
